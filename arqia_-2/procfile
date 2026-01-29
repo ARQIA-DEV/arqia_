@@ -1,1 +1,1 @@
-web: gunicorn arqia.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 400 --log-file -
+web: python manage.py migrate --noinput --settings=arqia.settings.prod && DJANGO_SETTINGS_MODULE=arqia.settings.prod gunicorn arqia.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --timeout 400 --log-file -
