@@ -1,0 +1,53 @@
+#
+# Python / Django project
+#
+
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+wheelhouse/
+
+# Pytest / coverage / reports
+.cache
+.pytest_cache/
+htmlcov/
+coverage.*
+.coverage
+
+# Django local settings / database
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env3
+*.env
+
+# Media / static output
+media/
+staticfiles/
+
+# IDEs & editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*.iml
+
+# macOS
+.DS_Store
