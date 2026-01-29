@@ -23,7 +23,9 @@ DATABASES = {
 }
 
 # CORS
-CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS").split(",")
+CORS_ALLOWED_ORIGINS = [
+  o.strip() for o in config("CORS_ALLOWED_ORIGINS", default="").split(",") if o.strip()
+]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "X-Requested-With",
