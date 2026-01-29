@@ -38,6 +38,11 @@ db.sqlite3-journal
 .env3
 *.env
 
+# Virtual environments
+.venv/
+venv/
+env/
+
 # Media / static output
 media/
 staticfiles/
