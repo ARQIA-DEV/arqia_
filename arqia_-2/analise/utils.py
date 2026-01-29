@@ -29,7 +29,7 @@ def normalizar_texto(texto: str) -> str:
 def analisar_com_gpt(texto: str, prompt: str = "") -> str:
     try:
         resposta = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5",
             messages=[
                 {"role": "system", "content": prompt or "Você é um especialista em análise de projetos."},
                 {"role": "user", "content": texto}
@@ -53,7 +53,7 @@ def analisar_documento_por_imagem(file_path: str, prompt: str) -> str:
             img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
 
             resposta = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5",
                 messages=[
                     {"role": "system", "content": prompt},
                     {
@@ -71,7 +71,7 @@ def analisar_documento_por_imagem(file_path: str, prompt: str) -> str:
 
         return "\n\n".join(respostas)
     except Exception as e:
-        logger.exception("Erro ao analisar imagem com GPT-4o")
+        logger.exception("Erro ao analisar imagem com GPT-5")
         return f"Erro ao processar imagem: {e}"
     
 def analisar_dwg(file_path: str) -> str:
