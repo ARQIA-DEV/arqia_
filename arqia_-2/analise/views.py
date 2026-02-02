@@ -9,19 +9,17 @@ from django.shortcuts import get_object_or_404
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from django_filters.rest_framework import DjangoFilterBackend
 
-from openai import OpenAI
 from .models import Documento, Categoria, LogDeSistema
+from .permissions import IsAuthenticatedOrOptions
 from .serializers import DocumentoSerializer
 from .tasks import analisar_documento_task
 from .prompts import PROMPT_MAP  # Importação do mapa de prompts
 
 logger = logging.getLogger(__name__)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def healthcheck(request):
     return JsonResponse({"status": "ok"})
@@ -30,7 +28,7 @@ class ListaDocumentosView(ListAPIView):
     serializer_class = DocumentoSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['categoria']
+    filterset_fields = ['categoria', 'status']
 
     def get_queryset(self):
         return Documento.objects.filter(usuario=self.request.user)
@@ -44,7 +42,7 @@ class DetalheDocumentoView(RetrieveAPIView):
         return get_object_or_404(self.queryset, pk=self.kwargs["pk"], usuario=self.request.user)
 
 class AnaliseDocumentoView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedOrOptions]
 
     def post(self, request, *args, **kwargs):
         if 'arquivo' not in request.FILES or 'categoria' not in request.data:
@@ -52,15 +50,22 @@ class AnaliseDocumentoView(APIView):
 
         arquivo = request.FILES['arquivo']
         categoria_nome = request.data['categoria']
+        categoria_slug = categoria_nome.strip().lower()
         nome_original = arquivo.name
         extensao = nome_original.split('.')[-1].lower()
-        tipos_suportados = ['pdf', 'docx', 'xlsx', 'dwg', 'ifc']
+        tipos_suportados = ['pdf']
+
+        if not categoria_slug:
+            return Response({"erro": "Categoria inválida."}, status=400)
 
         if arquivo.size > 5 * 1024 * 1024:
             return Response({"erro": "Arquivo muito grande. Tamanho máximo: 5MB"}, status=400)
 
         if extensao not in tipos_suportados:
-            return Response({"erro": f"Tipo de arquivo não suportado: .{extensao}"}, status=400)
+            return Response(
+                {"erro": "No momento, apenas arquivos PDF são suportados para análise automatizada."},
+                status=400,
+            )
 
         nome_unico = f"{uuid.uuid4().hex}_{nome_original}"
         caminho = os.path.join(settings.MEDIA_ROOT, 'uploads', nome_unico)
@@ -77,21 +82,23 @@ class AnaliseDocumentoView(APIView):
         try:
             documento = Documento.objects.create(
                 nome_arquivo=nome_original,
-                categoria=Categoria.objects.get_or_create(nome=categoria_nome)[0],
+                categoria=Categoria.objects.get_or_create(nome=categoria_slug)[0],
                 arquivo=f'uploads/{nome_unico}',
+                status=Documento.Status.QUEUED,
+                error_message='',
                 usuario=request.user
             )
 
             with open(caminho, 'rb') as f:
                 arquivo_base64 = b64encode(f.read()).decode()
 
-            prompt = PROMPT_MAP.get(categoria_nome.lower(), PROMPT_MAP["outros"])
+            prompt = PROMPT_MAP.get(categoria_slug, PROMPT_MAP["outros"])
 
             analisar_documento_task.delay(
                 documento.id,
-                arquivo_base64,         # ou conteudo_base64
+                arquivo_base64,
                 extensao,
-                categoria_nome,         # <- ESSE é o 6º argumento!
+                categoria_slug,
                 prompt,
                 request.user.id
             )
@@ -106,7 +113,8 @@ class AnaliseDocumentoView(APIView):
 
             return Response({
                 "mensagem": "Documento enviado para análise. Você será notificado quando estiver pronto.",
-                "documento_id": documento.id
+                "documento_id": documento.id,
+                "status": documento.status,
             }, status=202)
 
         except Exception:

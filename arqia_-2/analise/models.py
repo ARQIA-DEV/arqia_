@@ -18,6 +18,12 @@ class Categoria(models.Model):
 
 
 class Documento(models.Model):
+    class Status(models.TextChoices):
+        QUEUED = 'queued', 'Na fila'
+        PROCESSING = 'processing', 'Processando'
+        DONE = 'done', 'Concluido'
+        ERROR = 'error', 'Erro'
+
     CATEGORIAS = [
         ('alimentos', 'Alimentos'),
         ('medicamentos', 'Medicamentos'),
@@ -40,6 +46,13 @@ class Documento(models.Model):
     )
     texto_extraido = models.TextField(blank=True, null=True)
     resultado_analise = models.TextField(blank=True, null=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.QUEUED,
+        db_index=True,
+    )
+    error_message = models.CharField(max_length=255, blank=True, default='')
     data_envio = models.DateTimeField(auto_now_add=True)
 
     usuario = models.ForeignKey(

@@ -1,17 +1,12 @@
 import os
 import logging
-import pdfplumber
 import pandas as pd
 from docx import Document
 import unicodedata
 import ezdxf
 from dotenv import load_dotenv
 from openai import OpenAI
-from PIL import Image
-import io
 import base64
-
-from pdf2image import convert_from_path
 
 try:
     import ifcopenshell
@@ -29,7 +24,7 @@ def normalizar_texto(texto: str) -> str:
 def analisar_com_gpt(texto: str, prompt: str = "") -> str:
     try:
         resposta = client.chat.completions.create(
-            model="gpt-5",
+            model="gpt-5-mini",
             messages=[
                 {"role": "system", "content": prompt or "Você é um especialista em análise de projetos."},
                 {"role": "user", "content": texto}
@@ -42,37 +37,59 @@ def analisar_com_gpt(texto: str, prompt: str = "") -> str:
         logger.exception("Erro ao consultar o modelo GPT")
         raise RuntimeError("Erro ao processar com OpenAI") from e
 
-def analisar_documento_por_imagem(file_path: str, prompt: str) -> str:
+def analisar_pdf_com_gpt5mini_base64(pdf_base64: str, filename: str, prompt: str) -> str:
     try:
-        imagens = convert_from_path(file_path)
-        respostas = []
+        if not os.getenv("OPENAI_API_KEY"):
+            raise ValueError("OPENAI_API_KEY não configurada.")
 
-        for i, imagem in enumerate(imagens):
-            img_byte_arr = io.BytesIO()
-            imagem.save(img_byte_arr, format='PNG')
-            img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
-
-            resposta = client.chat.completions.create(
-                model="gpt-5",
-                messages=[
-                    {"role": "system", "content": prompt},
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_base64}"}},
-                            {"type": "text", "text": f"Esta é a página {i+1} do projeto. Analise os principais elementos técnicos e estruturais."}
-                        ]
-                    }
-                ],
-                max_tokens=1000,
-                temperature=0.3
-            )
-            respostas.append(resposta.choices[0].message.content.strip())
-
-        return "\n\n".join(respostas)
+        file_data = f"data:application/pdf;base64,{pdf_base64}"
+        resposta = client.responses.create(
+            model="gpt-5-mini",
+            input=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": prompt or "Você é um especialista em análise de projetos.",
+                        },
+                        {
+                            "type": "input_file",
+                            "filename": filename,
+                            "file_data": file_data,
+                        },
+                    ],
+                }
+            ],
+            store=False,
+            reasoning={"effort": "minimal"},
+        )
+        return (resposta.output_text or "").strip()
     except Exception as e:
-        logger.exception("Erro ao analisar imagem com GPT-5")
-        return f"Erro ao processar imagem: {e}"
+        logger.exception("Erro ao analisar PDF com GPT-5-mini")
+        raise RuntimeError("Erro ao processar PDF com OpenAI") from e
+
+
+def analisar_pdf_com_gpt5mini(pdf_base64: str, filename: str, prompt: str) -> str:
+    return analisar_pdf_com_gpt5mini_base64(
+        pdf_base64=pdf_base64,
+        filename=filename,
+        prompt=prompt,
+    )
+
+def analisar_pdf_por_input_file(file_path: str, prompt: str = "") -> str:
+    try:
+        with open(file_path, "rb") as arquivo_pdf:
+            arquivo_base64 = base64.b64encode(arquivo_pdf.read()).decode("utf-8")
+
+        return analisar_pdf_com_gpt5mini_base64(
+            pdf_base64=arquivo_base64,
+            filename=os.path.basename(file_path),
+            prompt=prompt,
+        )
+    except Exception as e:
+        logger.exception("Erro ao analisar PDF por arquivo")
+        return f"Erro ao processar PDF: {e}"
     
 def analisar_dwg(file_path: str) -> str:
     try:
@@ -99,7 +116,7 @@ def analisar_documento_por_tipo(file_path: str, file_type: str, prompt: str = ""
     try:
         file_type = file_type.lower()
         if file_type == 'pdf':
-            return analisar_documento_por_imagem(file_path, prompt)
+            return analisar_pdf_por_input_file(file_path, prompt)
         elif file_type == 'docx':
             doc = Document(file_path)
             texto = "\n".join(p.text for p in doc.paragraphs)

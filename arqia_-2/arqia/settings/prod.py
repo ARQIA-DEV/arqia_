@@ -1,7 +1,8 @@
 from arqia.settings.base import *
 from decouple import config
 import dj_database_url
-from corsheaders.defaults import default_headers, default_methods
+import re
+from corsheaders.defaults import default_headers
 import ssl  # necessário para configurar o Redis seguro com Celery
 import certifi
 
@@ -11,6 +12,8 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS").split(",")
 
 # Segurança
 SECURE_SSL_REDIRECT = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
@@ -23,25 +26,24 @@ DATABASES = {
 }
 
 # CORS
-CORS_ALLOWED_ORIGINS = [
-  o.strip() for o in config("CORS_ALLOWED_ORIGINS", default="").split(",") if o.strip()
+def env_csv(name: str, default: str = "") -> list[str]:
+    raw = config(name, default=default)
+    items = [x.strip() for x in raw.split(",") if x.strip()]
+    # Remove trailing slash (evita corsheaders.E014).
+    return [re.sub(r"/+$", "", x) for x in items]
+
+
+CORS_ALLOWED_ORIGINS = env_csv("CORS_ALLOWED_ORIGINS", default="")
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://arqia-front-main-3(-[a-z0-9-]+)?\.vercel\.app$",
+    r"^https://arqia-front-main-3(-[a-z0-9-]+)?-arqias-projects\.vercel\.app$",
 ]
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_HEADERS = list(default_headers) + [
-    "X-Requested-With",
-    "X-CSRFToken",
-    "Authorization",
-    "Content-Type",
-    "Accept"
-]
-CORS_ALLOW_METHODS = list(default_methods) + [
-    "GET",
-    "POST",
-    "PUT",
-    "PATCH",
-    "DELETE",
-    "OPTIONS"
-]
+
+CORS_URLS_REGEX = r"^/api/.*$"
+
+CORS_ALLOW_CREDENTIALS = config("CORS_ALLOW_CREDENTIALS", default=False, cast=bool)
+CORS_ALLOW_HEADERS = list(default_headers) + ["authorization"]
 
 # Static e Media
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')

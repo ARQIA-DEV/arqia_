@@ -8,11 +8,37 @@ services:
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: arqia.settings.prod
+      - key: OPENAI_API_KEY
+        sync: false
       - key: SECRET_KEY
         sync: false
       - key: DATABASE_URL
         fromDatabase:
           name: arqia_adv7
           property: connectionString
+      - key: REDIS_URL
+        sync: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com
+
+  - type: worker
+    name: arqia-worker
+    runtime: python-3.11.9
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: "DJANGO_SETTINGS_MODULE=arqia.settings.prod celery -A arqia worker --loglevel=info --concurrency=2"
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: arqia.settings.prod
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: arqia_adv7
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
       - key: ALLOWED_HOSTS
         value: .onrender.com
