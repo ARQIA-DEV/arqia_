@@ -5,6 +5,7 @@ from docx import Document
 import unicodedata
 import ezdxf
 from dotenv import load_dotenv
+import openai as openai_sdk
 from openai import OpenAI
 import base64
 
@@ -16,6 +17,16 @@ except ImportError:
 load_dotenv()
 logger = logging.getLogger(__name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+OPENAI_SDK_VERSION = getattr(openai_sdk, "__version__", "desconhecida")
+
+
+def _assert_responses_api_available() -> None:
+    if not hasattr(client, "responses"):
+        raise RuntimeError(
+            "SDK openai sem suporte a client.responses "
+            f"(versao instalada: {OPENAI_SDK_VERSION}). "
+            "Atualize para openai>=1.40.0 e faça redeploy do web e worker."
+        )
 
 def normalizar_texto(texto: str) -> str:
     texto = texto.lower()
@@ -41,6 +52,7 @@ def analisar_pdf_com_gpt5mini_base64(pdf_base64: str, filename: str, prompt: str
     try:
         if not os.getenv("OPENAI_API_KEY"):
             raise ValueError("OPENAI_API_KEY não configurada.")
+        _assert_responses_api_available()
 
         file_data = f"data:application/pdf;base64,{pdf_base64}"
         resposta = client.responses.create(

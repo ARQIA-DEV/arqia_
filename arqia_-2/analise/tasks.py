@@ -52,6 +52,7 @@ def analisar_documento_task(documento_id, arquivo_base64, extensao, categoria_no
         )
 
         logger.info(f"[Celery] ✅ Análise concluída com sucesso para o documento ID {documento_id}")
+        return {"documento_id": documento_id, "status": Documento.Status.DONE}
 
     except Exception as e:
         logger.exception(f"[Celery] ❌ Erro ao analisar documento ID {documento_id}")
@@ -67,3 +68,4 @@ def analisar_documento_task(documento_id, arquivo_base64, extensao, categoria_no
                 documento=documento,
                 usuario=user if user else None
             )
+        raise
