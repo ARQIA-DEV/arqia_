@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from django_filters.rest_framework import DjangoFilterBackend
@@ -43,6 +44,7 @@ class DetalheDocumentoView(RetrieveAPIView):
 
 class AnaliseDocumentoView(APIView):
     permission_classes = [IsAuthenticatedOrOptions]
+    parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request, *args, **kwargs):
         if 'arquivo' not in request.FILES or 'categoria' not in request.data:
