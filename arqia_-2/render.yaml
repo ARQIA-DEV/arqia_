@@ -2,7 +2,7 @@ services:
   - type: web
     name: arqia-backend
     runtime: python-3.11.9
-    plan: free
+    plan: standard
     buildCommand: ./build.sh
     startCommand: "python manage.py migrate --noinput --settings=arqia.settings.prod && DJANGO_SETTINGS_MODULE=arqia.settings.prod gunicorn arqia.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --timeout 400 --log-file -"
     envVars:
@@ -24,7 +24,7 @@ services:
   - type: worker
     name: arqia-worker
     runtime: python-3.11.9
-    plan: free
+    plan: standard
     buildCommand: ./build.sh
     startCommand: "DJANGO_SETTINGS_MODULE=arqia.settings.prod celery -A arqia worker --loglevel=info --concurrency=2"
     envVars:

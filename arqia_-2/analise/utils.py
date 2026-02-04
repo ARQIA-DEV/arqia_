@@ -16,11 +16,17 @@ except ImportError:
 
 load_dotenv()
 logger = logging.getLogger(__name__)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 OPENAI_SDK_VERSION = getattr(openai_sdk, "__version__", "desconhecida")
 
 
-def _assert_responses_api_available() -> None:
+def get_openai_client() -> OpenAI:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY não configurada.")
+    return OpenAI(api_key=api_key)
+
+
+def _assert_responses_api_available(client: OpenAI) -> None:
     if not hasattr(client, "responses"):
         raise RuntimeError(
             "SDK openai sem suporte a client.responses "
@@ -34,6 +40,7 @@ def normalizar_texto(texto: str) -> str:
 
 def analisar_com_gpt(texto: str, prompt: str = "") -> str:
     try:
+        client = get_openai_client()
         resposta = client.chat.completions.create(
             model="gpt-5-mini",
             messages=[
@@ -50,9 +57,8 @@ def analisar_com_gpt(texto: str, prompt: str = "") -> str:
 
 def analisar_pdf_com_gpt5mini_base64(pdf_base64: str, filename: str, prompt: str) -> str:
     try:
-        if not os.getenv("OPENAI_API_KEY"):
-            raise ValueError("OPENAI_API_KEY não configurada.")
-        _assert_responses_api_available()
+        client = get_openai_client()
+        _assert_responses_api_available(client)
 
         file_data = f"data:application/pdf;base64,{pdf_base64}"
         resposta = client.responses.create(
@@ -79,6 +85,8 @@ def analisar_pdf_com_gpt5mini_base64(pdf_base64: str, filename: str, prompt: str
         return (resposta.output_text or "").strip()
     except Exception as e:
         logger.exception("Erro ao analisar PDF com GPT-5-mini")
+        if "OPENAI_API_KEY não configurada." in str(e):
+            raise RuntimeError("OPENAI_API_KEY não configurada.") from e
         raise RuntimeError("Erro ao processar PDF com OpenAI") from e
 
 

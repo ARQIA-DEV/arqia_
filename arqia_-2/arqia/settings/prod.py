@@ -2,6 +2,7 @@ from arqia.settings.base import *
 from decouple import config
 import dj_database_url
 import re
+from urllib.parse import urlparse, urlunparse
 from corsheaders.defaults import default_headers
 import ssl  # necessário para configurar o Redis seguro com Celery
 import certifi
@@ -45,6 +46,17 @@ CORS_URLS_REGEX = r"^/api/.*$"
 CORS_ALLOW_CREDENTIALS = config("CORS_ALLOW_CREDENTIALS", default=False, cast=bool)
 CORS_ALLOW_HEADERS = list(default_headers) + ["authorization"]
 
+
+def normalize_redis_url(raw_url: str) -> str:
+    parsed = urlparse(raw_url)
+    if not parsed.scheme:
+        return raw_url
+
+    # Render/Redis Cloud pode fornecer URL sem DB explícito (ex.: ...:6379/).
+    if not parsed.path or parsed.path.strip("/") == "":
+        parsed = parsed._replace(path="/0")
+    return urlunparse(parsed)
+
 # Static e Media
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
@@ -68,13 +80,16 @@ LOGGING = {
     },
 }
 
-CELERY_BROKER_URL = config("REDIS_URL")
+CELERY_BROKER_URL = normalize_redis_url(config("REDIS_URL"))
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_ACCEPT_CONTENT = ['json']
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 20
 
-#CELERY_BROKER_USE_SSL = {
-#    "ssl_cert_reqs": ssl.CERT_REQUIRED,
-#    "ssl_ca_certs": certifi.where()
-#}
-#CELERY_REDIS_BACKEND_USE_SSL = CELERY_BROKER_USE_SSL
+if urlparse(CELERY_BROKER_URL).scheme == "rediss":
+    CELERY_BROKER_USE_SSL = {
+        "ssl_cert_reqs": ssl.CERT_REQUIRED,
+        "ssl_ca_certs": certifi.where(),
+    }
+    CELERY_REDIS_BACKEND_USE_SSL = CELERY_BROKER_USE_SSL

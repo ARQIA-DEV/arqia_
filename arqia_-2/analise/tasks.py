@@ -1,3 +1,4 @@
+import os
 import logging
 from celery import shared_task
 from django.contrib.auth.models import User
@@ -8,6 +9,12 @@ logger = logging.getLogger(__name__)
 
 @shared_task
 def analisar_documento_task(documento_id, arquivo_base64, extensao, categoria_nome, prompt, user_id):
+    logger.info(
+        "[Celery] task recebeu doc_id=%s openai_key=%s",
+        documento_id,
+        "ok" if os.getenv("OPENAI_API_KEY") else "MISSING",
+    )
+
     user = None
     try:
         user = User.objects.filter(pk=user_id).first()
